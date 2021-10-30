@@ -21,20 +21,14 @@ func Index(c *gin.Context, db *sql.DB) {
 
 func Get(c *gin.Context, db *sql.DB) {
 	idParam := c.Param("id")
-	row := db.QueryRow("SELECT * FROM movies WHERE id = ?;", idParam)
-	movie := new(models.Movie)
-	err := row.Scan(&movie.Id, &movie.Name, &movie.Year, &movie.Score)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(404, gin.H{
-				"message": "Record was not found",
-			})
-		} else {
-			util.CheckErr(err)
-		}
-	} else {
-		c.JSON(200, movie)
+	movie := getMovie(db, &idParam);
+	if (movie == nil) {
+		c.JSON(404, gin.H{
+			"message": "Record was not found",
+		});
 	}
+
+	c.JSON(200, movie);
 }
 
 func Create(c *gin.Context, db *sql.DB) {
@@ -43,24 +37,21 @@ func Create(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	c.IndentedJSON(http.StatusCreated, movie)
-
-	insertMovieSQL := `INSERT INTO movies(id, name, year, score) VALUES (?, ?, ?, ?);`
+	insertMovieSQL := `INSERT INTO movies(id, name, year, score, summary) VALUES (?, ?, ?, ?, ?);`
 	statement, err := db.Prepare(insertMovieSQL) // Prepare statement.
 	// This is good to avoid SQL injections
 	util.CheckErr(err)
-	_, err = statement.Exec(movie.Id, movie.Name, movie.Year, movie.Score)
+	_, err = statement.Exec(movie.Id, movie.Name, movie.Year, movie.Score, movie.Summary)
 	util.CheckErr(err)
-	c.JSON(200, gin.H{
-		"message": "Succesfully inserted the movie",
-	})
+	
+	c.JSON(200, movie);
 }
 
 func GetSummaries(c *gin.Context, db *sql.DB) {
 	movies := getMovies(db)
 	var wg sync.WaitGroup
 
-	for _, movie := range(movies) {
+	for _, movie := range movies {
 		// TODO: Add worker pool
 		wg.Add(1)
 		go updateSummary(movie, db, &wg)
@@ -119,4 +110,19 @@ func getMovies(db *sql.DB) []models.Movie {
 	rows.Close()
 
 	return movies
+}
+
+func getMovie(db *sql.DB, id *string) *models.Movie {
+	row := db.QueryRow("SELECT * FROM movies WHERE id = ?;", id)
+	movie := new(models.Movie)
+	err := row.Scan(&movie.Id, &movie.Name, &movie.Year, &movie.Score, &movie.Summary)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil;
+		} else {
+			util.CheckErr(err)
+		}
+	}
+
+	return movie
 }
