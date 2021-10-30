@@ -3,13 +3,16 @@ package routing
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"mpp/controllers"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func Init(db *sql.DB) {
 	adress := "localhost:8090"
 	r := gin.Default()
+	r.Use(cors.Default())
 	setup(r, db)
 	r.Run(adress)
 	fmt.Println("Server started at " + adress)
